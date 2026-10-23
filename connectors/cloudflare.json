@@ -1,0 +1,279 @@
+{
+  "connector": "cloudflare",
+  "source": "HAND-BUILT from the Cloudflare API reference (https://developers.cloudflare.com/api/). Cloudflare's current official MCP server (https://mcp.cloudflare.com/mcp) exposes only three tools (search, execute, docs) using Code Mode, so it cannot supply ~20 typed tools. The older product-specific servers are deprecated and have no zone/DNS/cache tools. These 20 tools are what a native typed Cloudflare MCP would plausibly expose: one tool per common REST operation, parameter names taken from the REST path and body fields. Names and descriptions are written here, not copied from a server.",
+  "tools": [
+    {
+      "name": "list_accounts",
+      "description": "List all accounts you have ownership or verified access to.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string", "description": "Filter by account name."},
+          "page": {"type": "integer", "description": "Page number of paginated results."},
+          "per_page": {"type": "integer", "description": "Maximum number of results per page."}
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "list_zones",
+      "description": "List, search, sort, and filter the zones (domains) in your account.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "name": {"type": "string", "description": "A domain name. Only zones with this exact name are returned."},
+          "account_id": {"type": "string", "description": "Only return zones owned by this account ID."},
+          "status": {"type": "string", "description": "Zone status filter: initializing, pending, active or moved."},
+          "page": {"type": "integer", "description": "Page number of paginated results."},
+          "per_page": {"type": "integer", "description": "Number of zones per page."}
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "get_zone",
+      "description": "Get the details of a single zone by its zone ID.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "zone_id": {"type": "string", "description": "Zone identifier (32-character hex string)."}
+        },
+        "required": ["zone_id"]
+      }
+    },
+    {
+      "name": "purge_cache",
+      "description": "Remove cached content for a zone. Purge everything, or purge selectively by URL, cache tag, hostname or URL prefix. Purging everything may temporarily increase load on your origin.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "zone_id": {"type": "string", "description": "Zone identifier (32-character hex string)."},
+          "purge_everything": {"type": "boolean", "description": "Set to true to purge all cached content for the zone. Cannot be combined with files, tags, hosts or prefixes."},
+          "files": {"type": "array", "items": {"type": "string"}, "description": "Full URLs of individual files to purge."},
+          "tags": {"type": "array", "items": {"type": "string"}, "description": "Cache-Tag values whose cached files should be purged."},
+          "hosts": {"type": "array", "items": {"type": "string"}, "description": "Hostnames whose cached files should be purged."},
+          "prefixes": {"type": "array", "items": {"type": "string"}, "description": "URL prefixes (without scheme) whose cached files should be purged."}
+        },
+        "required": ["zone_id"]
+      }
+    },
+    {
+      "name": "list_dns_records",
+      "description": "List, search, sort, and filter the DNS records of a zone.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "zone_id": {"type": "string", "description": "Zone identifier (32-character hex string)."},
+          "type": {"type": "string", "description": "Record type filter, e.g. A, AAAA, CNAME, MX, TXT."},
+          "name": {"type": "string", "description": "Exact record name filter, e.g. www.example.com."},
+          "content": {"type": "string", "description": "Exact record content filter."},
+          "proxied": {"type": "boolean", "description": "Filter by whether the record is proxied through Cloudflare."},
+          "page": {"type": "integer", "description": "Page number of paginated results."},
+          "per_page": {"type": "integer", "description": "Number of records per page."}
+        },
+        "required": ["zone_id"]
+      }
+    },
+    {
+      "name": "create_dns_record",
+      "description": "Create a new DNS record for a zone.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "zone_id": {"type": "string", "description": "Zone identifier (32-character hex string)."},
+          "type": {"type": "string", "description": "Record type, e.g. A, AAAA, CNAME, MX, TXT."},
+          "name": {"type": "string", "description": "DNS record name (or @ for the zone apex)."},
+          "content": {"type": "string", "description": "Record content, e.g. an IPv4 address for an A record."},
+          "ttl": {"type": "integer", "description": "Time to live in seconds. 1 means automatic."},
+          "proxied": {"type": "boolean", "description": "Whether the record is receiving the performance and security benefits of Cloudflare."},
+          "priority": {"type": "integer", "description": "Required for MX, SRV and URI records."},
+          "comment": {"type": "string", "description": "Comments or notes about the DNS record."}
+        },
+        "required": ["zone_id", "type", "name", "content"]
+      }
+    },
+    {
+      "name": "update_dns_record",
+      "description": "Update an existing DNS record. Only the fields provided are changed.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "zone_id": {"type": "string", "description": "Zone identifier (32-character hex string)."},
+          "dns_record_id": {"type": "string", "description": "DNS record identifier (32-character hex string)."},
+          "type": {"type": "string", "description": "Record type, e.g. A, AAAA, CNAME, MX, TXT."},
+          "name": {"type": "string", "description": "DNS record name (or @ for the zone apex)."},
+          "content": {"type": "string", "description": "Record content."},
+          "ttl": {"type": "integer", "description": "Time to live in seconds. 1 means automatic."},
+          "proxied": {"type": "boolean", "description": "Whether the record is proxied through Cloudflare."},
+          "comment": {"type": "string", "description": "Comments or notes about the DNS record."}
+        },
+        "required": ["zone_id", "dns_record_id"]
+      }
+    },
+    {
+      "name": "delete_dns_record",
+      "description": "Delete a DNS record from a zone.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "zone_id": {"type": "string", "description": "Zone identifier (32-character hex string)."},
+          "dns_record_id": {"type": "string", "description": "DNS record identifier (32-character hex string)."}
+        },
+        "required": ["zone_id", "dns_record_id"]
+      }
+    },
+    {
+      "name": "get_zone_setting",
+      "description": "Get the value of a single zone setting, for example ssl, min_tls_version, always_use_https or development_mode.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "zone_id": {"type": "string", "description": "Zone identifier (32-character hex string)."},
+          "setting_id": {"type": "string", "description": "Setting name, e.g. ssl, min_tls_version, always_use_https, development_mode."}
+        },
+        "required": ["zone_id", "setting_id"]
+      }
+    },
+    {
+      "name": "update_zone_setting",
+      "description": "Update the value of a single zone setting, for example turn development mode on or change the SSL mode.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "zone_id": {"type": "string", "description": "Zone identifier (32-character hex string)."},
+          "setting_id": {"type": "string", "description": "Setting name, e.g. ssl, min_tls_version, always_use_https, development_mode."},
+          "value": {"type": "string", "description": "New value for the setting, e.g. on, off, full, strict, 1.2."}
+        },
+        "required": ["zone_id", "setting_id", "value"]
+      }
+    },
+    {
+      "name": "list_rulesets",
+      "description": "List the rulesets (redirect, cache, WAF, rate limiting and other rules) configured for a zone.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "zone_id": {"type": "string", "description": "Zone identifier (32-character hex string)."},
+          "cursor": {"type": "string", "description": "Pagination cursor from a previous response."},
+          "per_page": {"type": "integer", "description": "Maximum number of rulesets to return."}
+        },
+        "required": ["zone_id"]
+      }
+    },
+    {
+      "name": "list_workers_scripts",
+      "description": "List the Workers scripts deployed in an account.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "account_id": {"type": "string", "description": "Account identifier (32-character hex string)."}
+        },
+        "required": ["account_id"]
+      }
+    },
+    {
+      "name": "delete_workers_script",
+      "description": "Delete a Workers script from an account.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "account_id": {"type": "string", "description": "Account identifier (32-character hex string)."},
+          "script_name": {"type": "string", "description": "Name of the Workers script."},
+          "force": {"type": "boolean", "description": "If true, delete the script even if it is still bound or has active deployments."}
+        },
+        "required": ["account_id", "script_name"]
+      }
+    },
+    {
+      "name": "list_kv_namespaces",
+      "description": "List the Workers KV namespaces in an account.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "account_id": {"type": "string", "description": "Account identifier (32-character hex string)."},
+          "page": {"type": "integer", "description": "Page number of paginated results."},
+          "per_page": {"type": "integer", "description": "Number of namespaces per page."}
+        },
+        "required": ["account_id"]
+      }
+    },
+    {
+      "name": "create_kv_namespace",
+      "description": "Create a Workers KV namespace.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "account_id": {"type": "string", "description": "Account identifier (32-character hex string)."},
+          "title": {"type": "string", "description": "A human-readable name for the namespace."}
+        },
+        "required": ["account_id", "title"]
+      }
+    },
+    {
+      "name": "list_r2_buckets",
+      "description": "List the R2 buckets in an account.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "account_id": {"type": "string", "description": "Account identifier (32-character hex string)."},
+          "name_contains": {"type": "string", "description": "Only return buckets whose name contains this string."},
+          "per_page": {"type": "integer", "description": "Maximum number of buckets to return."}
+        },
+        "required": ["account_id"]
+      }
+    },
+    {
+      "name": "create_r2_bucket",
+      "description": "Create an R2 bucket.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "account_id": {"type": "string", "description": "Account identifier (32-character hex string)."},
+          "name": {"type": "string", "description": "Name of the bucket."},
+          "locationHint": {"type": "string", "description": "Location hint for the bucket: apac, eeur, enam, weur or wnam."},
+          "storageClass": {"type": "string", "description": "Storage class: Standard or InfrequentAccess."}
+        },
+        "required": ["account_id", "name"]
+      }
+    },
+    {
+      "name": "list_d1_databases",
+      "description": "List the D1 databases in an account.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "account_id": {"type": "string", "description": "Account identifier (32-character hex string)."},
+          "name": {"type": "string", "description": "Only return databases with this name."},
+          "page": {"type": "integer", "description": "Page number of paginated results."},
+          "per_page": {"type": "integer", "description": "Number of databases per page."}
+        },
+        "required": ["account_id"]
+      }
+    },
+    {
+      "name": "query_d1_database",
+      "description": "Run a single SQL query against a D1 database and return the result rows.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "account_id": {"type": "string", "description": "Account identifier (32-character hex string)."},
+          "database_id": {"type": "string", "description": "D1 database identifier (UUID)."},
+          "sql": {"type": "string", "description": "The SQL query to run."},
+          "params": {"type": "array", "items": {"type": "string"}, "description": "Positional parameters bound to ? placeholders in the query."}
+        },
+        "required": ["account_id", "database_id", "sql"]
+      }
+    },
+    {
+      "name": "list_pages_projects",
+      "description": "List the Cloudflare Pages projects in an account.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "account_id": {"type": "string", "description": "Account identifier (32-character hex string)."}
+        },
+        "required": ["account_id"]
+      }
+    }
+  ]
+}

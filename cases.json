@@ -1,0 +1,113 @@
+{
+  "system": "You are an assistant with access to tools. Complete the task and return the results. Do not reply without having done the task. Do not ask for clarification; choose the most reasonable interpretation and act.",
+  "_matchers": "A bare JSON value means exact match. {\"re\": p} regex (case-insensitive, search). {\"uuid\": u} equal ignoring dashes and case. {\"any\": [m, ...]} any matcher. {\"absent\": true} parameter must not be sent. A key 'a|b' means exactly one of the alternative paths a or b. Dotted paths address nested values; list indexes are numbers. allowed_optional maps path to a matcher (or null for any value).",
+  "cases": [
+    {
+      "id": "O1", "tier": "obvious",
+      "notes": ["Slack channels: #releases = C07RLS4K2, #releases-archive = C05ARC9Z1, #general = C01GEN0AA2", "Current version: v2.14", "Deploy window: Thursday 14:00 UTC"],
+      "task": "Post \"v2.14 deploy finished\" in the #releases Slack channel.",
+      "accept": [{"tool": "slack.slack_send_message", "params": {"channel_id": "C07RLS4K2", "message": {"re": "v2\\.14.*deploy.*finished"}}}]
+    },
+    {
+      "id": "O2", "tier": "obvious",
+      "notes": ["GitHub org: acme-labs", "Repos: billing-api, billing-web, auth-service, docs-site", "Billing API retry bug = billing-api issue 482 (open)", "Billing web issue 482 is an unrelated typo fix (closed)", "Fix PR: 517"],
+      "task": "Comment \"Fixed in #517\" on GitHub issue 482 in the billing-api repo.",
+      "accept": [{"tool": "github.add_issue_comment", "params": {"owner": "acme-labs", "repo": "billing-api", "issue_number": 482, "body": {"re": "fixed in #517"}}}]
+    },
+    {
+      "id": "O3", "tier": "obvious",
+      "notes": ["Cloudflare account id: d41e8a6b0c3f4725b9e1a7c2f0d85e36", "Zones: example.com = 9f2c1d7e4b8a40c3a6e5d0f1b2c37a84, example.org = 51ab7e03c9d84f6e8a2b1c0d9e7f3a65", "Last deploy: 14:00 UTC"],
+      "task": "Purge the entire Cloudflare cache for the example.com zone.",
+      "accept": [{"tool": "cloudflare.purge_cache", "params": {"zone_id": "9f2c1d7e4b8a40c3a6e5d0f1b2c37a84", "purge_everything": true}}]
+    },
+    {
+      "id": "O4", "tier": "obvious",
+      "notes": ["Notion pages: \"Q4 Launch Plan\" = 7c3e91a2-5b4d-4f60-9a1e-2d8b6c0f4e13, \"Q3 Launch Plan\" = 1a9d5f70-3e2c-48b7-b6a4-9c0e7d2f8b51", "Teamspaces: Engineering = 3f8a2c60-9d14-4b7e-a5c3-0e1f6b9d2a47", "Reviewer: Priya"],
+      "task": "Add a comment \"Reviewed, looks good\" on the Notion page \"Q4 Launch Plan\".",
+      "accept": [{"tool": "notion.notion-create-comment", "params": {"page_id": {"uuid": "7c3e91a2-5b4d-4f60-9a1e-2d8b6c0f4e13"}, "markdown|rich_text.0.text.content": {"re": "reviewed.*looks good"}}, "allowed_optional": {"rich_text.0.type": {"any": ["text"]}}}]
+    },
+    {
+      "id": "O5", "tier": "obvious",
+      "notes": ["Linear teams: Platform (key PLT) = a3c71e5f-2b94-4d08-9f6a-1e0d8c5b7a42, Mobile (key MOB) = c9e02b41-7d5a-4f13-8a6c-3b1f9d0e5a27", "Existing issue: PLT-77 \"Pricing page\"", "Sprint: 42"],
+      "task": "Create a Linear issue titled \"Fix login timeout\" in the Platform team.",
+      "accept": [{"tool": "linear.save_issue", "params": {"title": "Fix login timeout", "team": {"any": ["Platform", "PLT", {"uuid": "a3c71e5f-2b94-4d08-9f6a-1e0d8c5b7a42"}]}, "id": {"absent": true}}}]
+    },
+    {
+      "id": "V1", "tier": "vague",
+      "notes": ["Slack channels: #releases (the release crew's channel) = C07RLS4K2, #eng = C03ENGQ77, #general = C01GEN0AA2", "The deploy just finished", "On-call this week: Marcus"],
+      "task": "Let the release crew know the deploy went out.",
+      "accept": [{"tool": "slack.slack_send_message", "params": {"channel_id": "C07RLS4K2", "message": {"re": "deploy|shipped|released|went out"}}}]
+    },
+    {
+      "id": "V2", "tier": "vague",
+      "notes": ["GitHub org: acme-labs, repo for invoices: billing-api", "Invoice rounding bug = billing-api issue 391 (open)", "Invoice PDF layout bug = billing-api issue 388 (open)", "Fix merged this morning"],
+      "task": "Close out the bug about invoices rounding wrong. It's sorted.",
+      "accept": [{"tool": "github.issue_write", "params": {"method": "update", "owner": "acme-labs", "repo": "billing-api", "issue_number": 391, "state": "closed"}, "allowed_optional": {"state_reason": {"any": ["completed"]}}}]
+    },
+    {
+      "id": "V3", "tier": "vague",
+      "notes": ["Zones: example.com = 9f2c1d7e4b8a40c3a6e5d0f1b2c37a84, example.org = 51ab7e03c9d84f6e8a2b1c0d9e7f3a65", "Cloudflare account id: d41e8a6b0c3f4725b9e1a7c2f0d85e36", "Push went live 10 minutes ago"],
+      "task": "The site's serving stale pages after the push. Sort it out for the .org domain.",
+      "accept": [{"tool": "cloudflare.purge_cache", "params": {"zone_id": "51ab7e03c9d84f6e8a2b1c0d9e7f3a65", "purge_everything": true}}]
+    },
+    {
+      "id": "V4", "tier": "vague",
+      "notes": ["Notion teamspaces: Engineering = 3f8a2c60-9d14-4b7e-a5c3-0e1f6b9d2a47, Design = b2e60f94-1c7a-4d38-8e5b-7a3c9f0d1e62", "Pages in Engineering: on-call rotation, runbooks, postmortems", "The on-call doc was last edited in September"],
+      "task": "Find the doc where engineering wrote down who's on call.",
+      "accept": [{"tool": "notion.notion-search", "params": {"query": {"re": "on-?call|rotation"}, "teamspace_id": {"uuid": "3f8a2c60-9d14-4b7e-a5c3-0e1f6b9d2a47"}}, "allowed_optional": {"page_size": null}}]
+    },
+    {
+      "id": "V5", "tier": "vague",
+      "notes": ["Slack users: Dana Okafor (finance) = U05A9B3QX, Dana Ortiz (design) = U06B7C4RY, Marcus Lee (eng) = U04C2D8ZP", "Invoice review is tomorrow at 10:00", "Channels: #finance = C06FINNC3"],
+      "task": "Ping Dana from finance about tomorrow's invoice review.",
+      "accept": [{"tool": "slack.slack_send_message", "params": {"channel_id": "U05A9B3QX", "message": {"re": "invoice review"}}}]
+    },
+    {
+      "id": "A1", "tier": "ambiguous",
+      "notes": ["GitHub org: acme-labs, repo that owns login code: auth-service", "Linear teams: Platform (PLT) = a3c71e5f-2b94-4d08-9f6a-1e0d8c5b7a42, Mobile (MOB) = c9e02b41-7d5a-4f13-8a6c-3b1f9d0e5a27", "Login bug: users get logged out after 5 minutes", "Slack: #eng = C03ENGQ77"],
+      "task": "Create a ticket for the login bug.",
+      "accept": [
+        {"tool": "github.issue_write", "params": {"method": "create", "owner": "acme-labs", "repo": "auth-service", "title": {"re": "log-?(in|ged|out)"}}, "allowed_optional": {"body": null}},
+        {"tool": "linear.save_issue", "params": {"team": {"any": ["Platform", "PLT", {"uuid": "a3c71e5f-2b94-4d08-9f6a-1e0d8c5b7a42"}]}, "title": {"re": "log-?(in|ged|out)"}, "id": {"absent": true}}, "allowed_optional": {"description": null}}
+      ]
+    },
+    {
+      "id": "A2", "tier": "ambiguous",
+      "notes": ["Linear issue PLT-82 \"Vendor integration\"", "GitHub: acme-labs/billing-api issue 455 \"Vendor integration\"", "Notion page \"Vendor Integration\" = 0d4f7a92-8b3e-4c51-9e6a-5f1b3c7d2a80", "Slack: #payments = C09PAYQ11", "Blocker: waiting on the card vendor's API keys"],
+      "task": "Leave a note on the vendor integration saying we're blocked on API keys.",
+      "accept": [
+        {"tool": "linear.save_comment", "params": {"issueId": "PLT-82", "body": {"re": "blocked.*api keys"}, "id": {"absent": true}}},
+        {"tool": "github.add_issue_comment", "params": {"owner": "acme-labs", "repo": "billing-api", "issue_number": 455, "body": {"re": "blocked.*api keys"}}},
+        {"tool": "notion.notion-create-comment", "params": {"page_id": {"uuid": "0d4f7a92-8b3e-4c51-9e6a-5f1b3c7d2a80"}, "markdown|rich_text.0.text.content": {"re": "blocked.*api keys"}}, "allowed_optional": {"rich_text.0.type": {"any": ["text"]}}}
+      ]
+    },
+    {
+      "id": "A3", "tier": "ambiguous",
+      "notes": ["GitHub org: acme-labs, repo: docs-site", "Linear team Platform (PLT) = a3c71e5f-2b94-4d08-9f6a-1e0d8c5b7a42", "Notion page \"Docs Roadmap\" = 9e7a3c15-4d82-4b60-a1f3-6c0d8e2b5f94", "Docs site currently runs on the old static generator"],
+      "task": "Track the work to migrate the docs site.",
+      "accept": [
+        {"tool": "github.issue_write", "params": {"method": "create", "owner": "acme-labs", "repo": "docs-site", "title": {"re": "migrat"}}, "allowed_optional": {"body": null}},
+        {"tool": "linear.save_issue", "params": {"team": {"any": ["Platform", "PLT", {"uuid": "a3c71e5f-2b94-4d08-9f6a-1e0d8c5b7a42"}]}, "title": {"re": "migrat"}, "id": {"absent": true}}, "allowed_optional": {"description": null}}
+      ]
+    },
+    {
+      "id": "A4", "tier": "ambiguous",
+      "notes": ["Slack: #eng = C03ENGQ77, #general = C01GEN0AA2", "Checkout bug: GitHub acme-labs/billing-web issue 604, Linear PLT-91", "Fix shipped at 09:30"],
+      "task": "Tell the team the checkout bug is fixed.",
+      "accept": [
+        {"tool": "slack.slack_send_message", "params": {"channel_id": {"any": ["C03ENGQ77", "C01GEN0AA2"]}, "message": {"re": "checkout.*fixed"}}, "allowed_optional": {"unfurl_app_links": null}},
+        {"tool": "github.add_issue_comment", "params": {"owner": "acme-labs", "repo": "billing-web", "issue_number": 604, "body": {"re": "fixed"}}},
+        {"tool": "linear.save_comment", "params": {"issueId": "PLT-91", "body": {"re": "fixed"}, "id": {"absent": true}}}
+      ]
+    },
+    {
+      "id": "A5", "tier": "ambiguous",
+      "notes": ["Notion page \"Pricing Page Redesign\" = e5b1c8d3-6a29-4f07-b3d4-8c0a2e9f7b16 (has a Status property: Not started / In progress / Done)", "Linear issue PLT-77 \"Pricing page\" (state: In Progress)", "GitHub: acme-labs/billing-web issue 612 \"Pricing page copy\" (open)"],
+      "task": "Move the pricing page to done.",
+      "accept": [
+        {"tool": "notion.notion-update-page", "params": {"page_id": {"uuid": "e5b1c8d3-6a29-4f07-b3d4-8c0a2e9f7b16"}, "command": "update_properties", "properties.Status": "Done"}},
+        {"tool": "linear.save_issue", "params": {"id": "PLT-77", "state": {"re": "^done$"}}}
+      ]
+    }
+  ]
+}

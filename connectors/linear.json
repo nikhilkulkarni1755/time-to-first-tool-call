@@ -1,0 +1,283 @@
+{
+  "connector": "linear",
+  "source": "Tool names and descriptions from the official Linear MCP server as listed at https://www.speakeasy.com/product/mcp-gateway/catalog/linear (31 tools) and https://docs.nomic.ai/docs/core/mcp-servers/linear. save_issue parameters from the public schema listing (glama.ai, linear-mcp-lean). All other parameter schemas are RECONSTRUCTED from the tool descriptions and Linear's documented object model: names are plausible, not verbatim. Linear's own tools/list needs OAuth (https://mcp.linear.app/mcp) and was not reachable here. Replace with a real tools/list snapshot when a Linear workspace is connected.",
+  "tools": [
+    {
+      "name": "save_issue",
+      "description": "Create or update a Linear issue. If `id` is provided, updates the existing issue; otherwise creates a new one. When creating, `title` and `team` are required. Note: use `assignee` (not `assigneeId`) to set the assignee — it accepts a user ID, name, email, or \"me\".",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string", "description": "Issue id or identifier to UPDATE; omit to create"},
+          "team": {"type": "string", "description": "Team name or id (required on create)"},
+          "state": {"type": "string", "description": "Workflow state name or id (e.g. In Progress)"},
+          "title": {"type": "string", "description": "Issue title (required on create)"},
+          "labels": {"type": "array", "items": {"type": "string"}, "description": "Label names or ids"},
+          "project": {"type": "string", "description": "Project name or id"},
+          "assignee": {"type": "string", "description": "User name or id, or \"me\""},
+          "priority": {"type": "number", "description": "0=None,1=Urgent,2=High,3=Medium,4=Low"},
+          "blockedBy": {"type": "array", "items": {"type": "string"}, "description": "Issue identifiers/ids that block this issue"},
+          "milestone": {"type": "string", "description": "Milestone name (needs project) or id"},
+          "description": {"type": "string", "description": "Markdown body"}
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "get_issue",
+      "description": "Retrieve detailed information about an issue by ID, including attachments and git branch name",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string", "description": "The issue ID or identifier (e.g. LIN-123)"}
+        },
+        "required": ["id"]
+      }
+    },
+    {
+      "name": "list_issues",
+      "description": "List issues in the user's Linear workspace. For my issues, use \"me\" as the assignee. Use \"null\" for no assignee.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "description": "Search query matched against issue title and description"},
+          "team": {"type": "string", "description": "Team name or id"},
+          "state": {"type": "string", "description": "Workflow state name or id"},
+          "assignee": {"type": "string", "description": "User name or id, \"me\", or \"null\" for no assignee"},
+          "project": {"type": "string", "description": "Project name or id"},
+          "label": {"type": "string", "description": "Label name or id"},
+          "priority": {"type": "number", "description": "0=None,1=Urgent,2=High,3=Medium,4=Low"},
+          "limit": {"type": "number", "description": "Maximum number of issues to return"},
+          "cursor": {"type": "string", "description": "Pagination cursor from a previous response"},
+          "orderBy": {"type": "string", "description": "Sort order: createdAt or updatedAt"}
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "list_issue_statuses",
+      "description": "List available issue statuses in a Linear team",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "team": {"type": "string", "description": "Team name or id"}
+        },
+        "required": ["team"]
+      }
+    },
+    {
+      "name": "list_issue_labels",
+      "description": "List available issue labels in a Linear workspace or team",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "team": {"type": "string", "description": "Team name or id; omit for workspace labels"},
+          "limit": {"type": "number", "description": "Maximum number of labels to return"},
+          "cursor": {"type": "string", "description": "Pagination cursor from a previous response"}
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "save_comment",
+      "description": "Create or update a comment on a Linear issue. If `id` is provided, updates the existing comment; otherwise creates a new one. When creating, `issueId` and `body` are required.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string", "description": "Comment id to UPDATE; omit to create"},
+          "issueId": {"type": "string", "description": "The issue ID or identifier to comment on (required on create)"},
+          "body": {"type": "string", "description": "Markdown comment body"},
+          "parentId": {"type": "string", "description": "Parent comment id when replying in a thread"}
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "list_comments",
+      "description": "List comments for a specific Linear issue",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "issueId": {"type": "string", "description": "The issue ID or identifier"},
+          "limit": {"type": "number", "description": "Maximum number of comments to return"},
+          "cursor": {"type": "string", "description": "Pagination cursor from a previous response"}
+        },
+        "required": ["issueId"]
+      }
+    },
+    {
+      "name": "list_projects",
+      "description": "List projects in the user's Linear workspace",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "description": "Search query matched against project name"},
+          "team": {"type": "string", "description": "Team name or id"},
+          "state": {"type": "string", "description": "Project state, e.g. planned, started, completed"},
+          "limit": {"type": "number", "description": "Maximum number of projects to return"},
+          "cursor": {"type": "string", "description": "Pagination cursor from a previous response"}
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "get_project",
+      "description": "Retrieve details of a specific project in Linear",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "description": "Project name or id"}
+        },
+        "required": ["query"]
+      }
+    },
+    {
+      "name": "save_project",
+      "description": "Create or update a Linear project. If `id` is provided, updates the existing project; otherwise creates a new one. When creating, `name` and at least one team (via `addTeams` or `setTeams`) are required.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string", "description": "Project id to UPDATE; omit to create"},
+          "name": {"type": "string", "description": "Project name (required on create)"},
+          "summary": {"type": "string", "description": "Short summary of the project"},
+          "description": {"type": "string", "description": "Markdown project description"},
+          "addTeams": {"type": "array", "items": {"type": "string"}, "description": "Team names or ids to add to the project"},
+          "setTeams": {"type": "array", "items": {"type": "string"}, "description": "Team names or ids that replace the project's teams"},
+          "state": {"type": "string", "description": "Project state"},
+          "lead": {"type": "string", "description": "User name or id, or \"me\""},
+          "startDate": {"type": "string", "description": "Start date, ISO 8601"},
+          "targetDate": {"type": "string", "description": "Target date, ISO 8601"}
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "list_milestones",
+      "description": "List all milestones in a Linear project",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "project": {"type": "string", "description": "Project name or id"}
+        },
+        "required": ["project"]
+      }
+    },
+    {
+      "name": "save_milestone",
+      "description": "Create or update a milestone in a Linear project. If `id` is provided, updates the existing milestone; otherwise creates a new one. When creating, `name` is required.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string", "description": "Milestone id to UPDATE; omit to create"},
+          "project": {"type": "string", "description": "Project name or id"},
+          "name": {"type": "string", "description": "Milestone name (required on create)"},
+          "description": {"type": "string", "description": "Markdown milestone description"},
+          "targetDate": {"type": "string", "description": "Target date, ISO 8601"}
+        },
+        "required": ["project"]
+      }
+    },
+    {
+      "name": "list_teams",
+      "description": "List teams in the user's Linear workspace",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "description": "Search query matched against team name"},
+          "limit": {"type": "number", "description": "Maximum number of teams to return"},
+          "cursor": {"type": "string", "description": "Pagination cursor from a previous response"}
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "get_team",
+      "description": "Retrieve details of a specific Linear team",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "description": "Team name, key or id"}
+        },
+        "required": ["query"]
+      }
+    },
+    {
+      "name": "list_users",
+      "description": "Retrieve users in the Linear workspace",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "description": "Search query matched against user name or email"},
+          "team": {"type": "string", "description": "Team name or id to filter members"},
+          "limit": {"type": "number", "description": "Maximum number of users to return"}
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "list_documents",
+      "description": "List documents in the user's Linear workspace",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "description": "Search query matched against document title"},
+          "project": {"type": "string", "description": "Project name or id"},
+          "limit": {"type": "number", "description": "Maximum number of documents to return"},
+          "cursor": {"type": "string", "description": "Pagination cursor from a previous response"}
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "get_document",
+      "description": "Retrieve a Linear document by ID or slug",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string", "description": "Document id or slug"}
+        },
+        "required": ["id"]
+      }
+    },
+    {
+      "name": "create_document",
+      "description": "Create a new document in Linear",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "title": {"type": "string", "description": "Document title"},
+          "content": {"type": "string", "description": "Markdown document content"},
+          "project": {"type": "string", "description": "Project name or id to attach the document to"},
+          "team": {"type": "string", "description": "Team name or id"}
+        },
+        "required": ["title"]
+      }
+    },
+    {
+      "name": "update_document",
+      "description": "Update an existing Linear document",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string", "description": "Document id or slug"},
+          "title": {"type": "string", "description": "New document title"},
+          "content": {"type": "string", "description": "New Markdown document content"},
+          "project": {"type": "string", "description": "Project name or id to move the document to"}
+        },
+        "required": ["id"]
+      }
+    },
+    {
+      "name": "search_documentation",
+      "description": "Search Linear's documentation to learn about features and usage",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "description": "Search query"},
+          "page": {"type": "number", "description": "Page number for pagination"}
+        },
+        "required": ["query"]
+      }
+    }
+  ]
+}

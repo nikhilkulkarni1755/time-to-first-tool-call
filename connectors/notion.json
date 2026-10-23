@@ -1,0 +1,285 @@
+{
+  "connector": "notion",
+  "source": "Live tools/list of the Notion MCP server as connected in this Claude Code session (descriptions and schemas copied; date 'pattern' regexes dropped and a few tags simplified), cross-checked against https://developers.notion.com/guides/mcp/mcp-supported-tools, read 2026-10-16. Omitted as oversized or niche: query-data-sources, query-multiple-data-sources, update-data-source, create-view, update-view, download/convert tools.",
+  "tools": [
+    {
+      "name": "notion-search",
+      "description": "Search Notion with short, specific keywords, or look up a user by name or email. Use this tool for every content search. This workspace uses keyword search, so prefer distinctive words from page titles or content over full questions. AI search, which answers natural-language questions and also searches connected sources, requires a Business or Enterprise plan with Notion AI.\n\nStart with a non-empty query and omit optional parameters unless needed. Do not add filters or sorting just to fill in defaults. Business or Enterprise is required for filters.edited_by_user_ids, filters.last_edited_date_range, filters.title_only=true, filters.content_status, more than one distinct teamspace across teamspace_id and filters.teamspace_ids, and sort other than relevance. On other plans, those options are dropped with a notice in the result, and results may be broader. Keep filters nested inside \"filters\". Use page_size, not limit.\n\nFor user lookup, set query_type=\"user\" and provide a name or email. A document about a person is a content search, not a user lookup.\n\n<example description=\"Find a page by title\">\n{\"query\":\"Q3 roadmap\"}\n</example>\n<example description=\"Find a user\">\n{\"query\":\"alex@example.com\",\"query_type\":\"user\"}\n</example>",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "data_source_url": {"type": "string", "description": "Optionally restrict keyword search to a data source URL returned in a <data-source> tag."},
+          "filters": {
+            "type": "object",
+            "description": "Optional exact filters for Notion workspace search. Omit unless required by the request. Keep filter fields nested here; do not send them at the top level. Some filters require Business access.",
+            "properties": {
+              "content_status": {"type": "string", "enum": ["all_with_archived", "all_without_archived", "verified_only", "archived_only"], "description": "Which pages to include by status. Omit for the default live pages. Supplying this field, even with the default value, requires Business access."},
+              "created_by_user_ids": {"type": "array", "items": {"type": "string"}, "description": "Optional filter to only produce search results created by the Notion users that have the specified user IDs. Use \"me\" for the connected user."},
+              "created_date_range": {"type": "object", "description": "Optional filter to only produce search results created within the specified date range.", "properties": {"end_date": {"type": "string", "description": "The end date of the date range as an ISO 8601 date string, if any."}, "start_date": {"type": "string", "description": "The start date of the date range as an ISO 8601 date string, if any."}}},
+              "edited_by_user_ids": {"type": "array", "items": {"type": "string"}, "description": "Optional filter to only produce search results edited by the Notion users that have the specified user IDs. Use \"me\" for the connected user. Available on the Business plan."},
+              "last_edited_date_range": {"type": "object", "description": "Optional filter to only produce search results last edited within the specified date range. Available on the Business plan.", "properties": {"end_date": {"type": "string", "description": "The end date of the date range as an ISO 8601 date string, if any."}, "start_date": {"type": "string", "description": "The start date of the date range as an ISO 8601 date string, if any."}}},
+              "teamspace_ids": {"type": "array", "items": {"type": "string"}, "description": "Optional filter to only produce search results inside one of the specified teamspaces. Selecting more than one teamspace is available on the Business plan; use teamspace_id for one teamspace on other plans."},
+              "title_only": {"type": "boolean", "description": "When true, match the query only against page and database titles instead of page content. Available on the Business plan."}
+            }
+          },
+          "max_highlight_length": {"type": "integer", "description": "Maximum character length for result highlights (default 200). Set to 0 to omit highlights entirely."},
+          "page_size": {"type": "integer", "description": "Maximum number of results to return (default 10). Lower values reduce response size."},
+          "page_url": {"type": "string", "description": "Optionally restrict keyword search to a page and its descendants. Accepts a Notion page URL or ID."},
+          "query": {"type": "string", "description": "Short, specific keywords for Notion content search. For user search, enter a name or email address. Provide a non-empty query unless intentionally browsing with filters or a non-relevance sort."},
+          "query_type": {"type": "string", "enum": ["internal", "user"], "description": "Specify type of the query as either \"internal\" or \"user\". Always include this input if performing \"user\" search."},
+          "sort": {"type": "string", "enum": ["relevance", "last_edited", "created"], "description": "Result ordering for Notion workspace search. Omit for the default \"relevance\" ordering. \"last_edited\" and \"created\" require Business access."},
+          "teamspace_id": {"type": "string", "description": "Optionally, provide the ID of a teamspace to restrict search results to. This will perform a search over content within the specified teamspace only. Accepts the teamspace ID (UUIDv4) with or without dashes."}
+        },
+        "required": ["query"]
+      }
+    },
+    {
+      "name": "notion-fetch",
+      "description": "Retrieves details about a Notion entity (page, database, data source, or saved database view) by URL or ID.\n\nProvide a URL or ID in `id`. Make multiple calls for multiple entities.\n\nFor pages, use path, verification, edit time, and truncation metadata to assess the source. Treat recency as context, not proof. Report material uncertainty when sources conflict.\n\nPages use enhanced Markdown format. For the complete specification, read the MCP resource `notion://docs/enhanced-markdown-spec` through your MCP client's resource-reading interface, or call the Notion \"fetch\" tool with this URI if your client does not support reading MCP resources. Do NOT pass this URI to any other URL-fetching tool.\n\nPass a `notion://docs/*` URI as `id` to read that MCP documentation resource.\n\nDatabases return data sources in `<data-source url=\"collection://...\">` tags. Fetch the collection:// URL for its schema and use it with update_data_source or query_data_sources. Multi-source databases return more than one data source.\n\nSaved views return filters, sorts, and display settings. To query their rows, use query_data_sources with `mode: \"view\"`.\n\nA null cover or icon means none; an omitted one means unavailable, not absent. Keep a page's Markdown icon attribute for edit round trips. File URLs expire; re-fetch to refresh them. Uploaded media blocks use stable `notion-file-block://` sources; keep them when editing or copying Markdown. Get download URLs with get_file_download_urls, or set `include_file_urls` to true for a `references` map. Before relying on page content, check `truncated`, `unknown_block_count`, and `unknown_block_ids` for omitted subtrees.\n\nSet `include_discussions` to true for discussion counts, markers, previews, and `discussion://` URLs that correlate with get_comments.\n\nUse get_tool_access to check tool availability, parameter restrictions, and upgrade links for this connection.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "string", "description": "The ID or URL of the Notion page, database, or data source to fetch. Supports notion.so URLs, Notion Sites URLs (*.notion.site), raw UUIDs, and data source URLs (collection://...). Pass \"memory\" to fetch the connected user's About page and memory database in this workspace without creating them. Pass a notion://docs/* URI to read that documentation resource. Also accepts an explicit saved view URL (view://...) from a database response. If a database block ID returns a validation error, use the collection:// URL from that error. Example: <example>notion://docs/enhanced-markdown-spec</example>."},
+          "include_discussions": {"type": "boolean", "description": "Whether to include discussion/comment indicators in the page output. When true, adds a <page-discussions> summary with discussion count, preview snippets, and discussion:// URLs. Use with the get_comments tool to retrieve full discussion content. Defaults to false."},
+          "include_file_urls": {"type": "boolean", "description": "Whether to return signed download URLs for uploaded files. Defaults to false. When false, page Markdown cites uploaded files by stable notion-file-block:// references and the response has no references map; call get_file_download_urls with the references when you need those files' contents. When true, the response's references map gives the signed URL for each reference."},
+          "include_transcript": {"type": "boolean", "description": "Whether to include meeting note transcripts. Defaults to false. When true, full transcripts are included; when false, a placeholder with the meeting note URL is shown instead."}
+        },
+        "required": ["id"]
+      }
+    },
+    {
+      "name": "notion-get-self",
+      "description": "Get the current Notion connection's workspace and authenticated user. Call with {}. Returns the workspace ID and name, and the user's ID, name, type, and email when available. Use this tool to identify the connected account. To check tool availability, use get_tool_access.",
+      "input_schema": {"type": "object", "properties": {}, "required": []}
+    },
+    {
+      "name": "notion-create-pages",
+      "description": "Creates one or more Notion pages with the specified properties and content.\n\n## Core rules\n\n**IMPORTANT**: Before writing page content, read the MCP resource `notion://docs/enhanced-markdown-spec` through your MCP client's resource-reading interface, or call the Notion \"fetch\" tool with this URI if your client does not support reading MCP resources. Do NOT pass this URI to any other URL-fetching tool. Do NOT guess or hallucinate Markdown syntax. Do not put the page title at the top of content; set it in properties. By default, use native Notion mentions for references you add to existing Notion pages, databases, data sources, people, and dates. Use Markdown links only for external URLs or when the user requests a plain link. For a person, use a user mention with their user URL, found with search using query_type \"user\"; do not write \"@Name\" as plain text. For a specific date or time, such as a due date or meeting time, use a date mention. The Markdown specification gives the mention syntax.\n\nUse a named destination as parent. Otherwise use \"creation_mode\": \"draft\" for a durable private page. Do not combine draft mode with parent, or move or share it without direction.\n\nFor a database destination, ALWAYS fetch first. Use its collection:// URL as data_source_id, exact property names, and title property. Never put a database ID in page_id. Outside a database, the only allowed property is the required \"title\".\n\nFor reusable instructions, set \"is_skill\": true. Before creating a skill, read the MCP resource `notion://docs/skills` through your MCP client's resource-reading interface. If your client does not support reading MCP resources, call the Notion \"fetch\" tool with this URI instead. Do NOT pass this URI to any other URL-fetching tool. Do not mark ordinary pages or drafts as skills.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "allow_async": {"type": "boolean", "description": "Default to true for page creation. Set to false only when the next step needs the created pages immediately, or when async execution rejects the request as too large. When this create operation is accepted for background execution, it returns an async_task result. Use get_async_task to wait for a succeeded status before taking a dependent action on the pages. For pages created with template_id, a succeeded status does not mean template content is ready; fetch and retry until it is ready before changing or relying on that content. If omitted or false, the tool keeps the existing synchronous result shape."},
+          "creation_mode": {"type": "string", "enum": ["draft"], "description": "If the user explicitly names a private or shared destination, omit \"creation_mode\" and use that parent. Otherwise, use \"draft\" when the user clearly wants a durable page but has not named a destination. Prefer this explicit draft mode over omitting the parent. Draft mode is server-enforced: it creates a private workspace-level page and cannot be combined with \"parent\". Create it without first asking where it should live. After creation, tell the user it is private and offer to move it once they name a destination."},
+          "pages": {
+            "type": "array",
+            "description": "The pages to create.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "content": {"type": "string", "description": "The content of the new page, using Notion Markdown. For people and dates, use user and date mentions rather than plain text; notion://docs/enhanced-markdown-spec gives the syntax."},
+                "cover": {"type": "string", "description": "An external image URL for the page cover. Use \"none\" to explicitly set no cover. Omit to leave unchanged."},
+                "icon": {"type": "string", "description": "An emoji character (e.g. \"🚀\"), a custom emoji by name (e.g. \":rocket_ship:\"), a Notion icon identifier as returned by fetch (e.g. \"icons/pizza_blue\"), or an external image URL. Use \"none\" to explicitly set no icon. Omit to leave unchanged. Keep the title free of a duplicate leading emoji because the icon renders separately."},
+                "is_skill": {"type": "boolean", "description": "Set to true only when the user asks for reusable instructions or a repeatable workflow. Do not mark ordinary reference pages, one-time documents, or drafts as skills. Before creating a skill, read the MCP resource `notion://docs/skills` through your MCP client's resource-reading interface. If your client does not support reading MCP resources, call the Notion \"fetch\" tool with this URI instead. Do NOT pass this URI to any other URL-fetching tool. False has the same effect as omitting the field."},
+                "preserve_internal_links": {"type": "boolean", "description": "Preserve internal Markdown links instead of converting them to native mentions."},
+                "properties": {"type": "object", "description": "The properties of the new page, which is a JSON map of property names to SQLite values.\nFor pages in a database, use the SQLite schema definition shown in <database>.\nFor pages outside of a database, the only allowed property is \"title\", which is the title of the page and is automatically shown at the top of the page as a large heading.\n**IMPORTANT**: Some property types require specific formats:\n- Date properties: Split into \"date:{property}:start\", \"date:{property}:end\" (optional), and \"date:{property}:is_datetime\" (0 or 1)\n- Place properties: Split into \"place:{property}:name\", \"place:{property}:address\", \"place:{property}:latitude\", \"place:{property}:longitude\", and \"place:{property}:google_place_id\" (optional)\n- Number properties: Use JavaScript numbers (not strings)\n- Checkbox properties: Use \"__YES__\" for checked, \"__NO__\" for unchecked\n- Relation properties: Use an array of related page URLs or page IDs, e.g. [\"https://www.notion.so/26ab1f9f4c5f80b18d3bd10a6b1d2f4e\", \"26ab1f9f-4c5f-80b1-8d3b-d10a6b1d2f4e\"]\n- Person properties: Use an array of user IDs, user or agent URLs, or group references copied from fetch output (\"space_permission_group-<UUID>\"). Bare group UUIDs are also supported.\n- Files properties: Use a JSON array of file IDs, Notion Folder URLs, and/or <folder> tags copied from fetch output. Folders are stored as native Folder references, not ordinary links.\n\n\n**Special property naming**: Properties named \"id\" or \"url\" (case insensitive) must be prefixed with \"userDefined:\" (e.g., \"userDefined:URL\", \"userDefined:id\")"},
+                "template_id": {"type": "string", "description": "The ID of a template to apply to this page. When specified, do not provide 'content' as the template will provide it. Properties can still be set alongside the template. Get template IDs from the <templates> section in the fetch tool results. Template application is asynchronous: the page starts blank and content appears shortly after."}
+              }
+            }
+          },
+          "parent": {
+            "type": "object",
+            "description": "All pages in one call share this parent. Pass \"memory\" to save a personal memory; see notion://docs/memory. Otherwise use a page (page_id), database page (database_id), data source (data_source_id), or teamspace root (teamspace_id, from get_teams). Teamspace roots require a user-backed connection and permission to add top-level pages. A database_id cannot be used when the database has more than one data source; fetch it and use the right collection:// URL as data_source_id. If omitted, pages are private at the workspace level. When no destination is named, prefer explicit \"creation_mode\": \"draft\" over omitting the parent.",
+            "properties": {
+              "type": {"type": "string", "enum": ["page_id", "database_id", "data_source_id"], "description": "Which kind of parent id is given."},
+              "page_id": {"type": "string", "description": "The ID of the parent page (with or without dashes), for example, 195de9221179449fab8075a27c979105"},
+              "database_id": {"type": "string", "description": "The ID of the parent database (with or without dashes), for example, 195de9221179449fab8075a27c979105"},
+              "data_source_id": {"type": "string", "description": "The ID of the parent data source (collection), with or without dashes. For example, f336d0bc-b841-465b-8045-024475c079dd"},
+              "teamspace_id": {"type": "string", "description": "The ID of the teamspace in which to create top-level pages (with or without dashes)."}
+            }
+          }
+        },
+        "required": ["pages"]
+      }
+    },
+    {
+      "name": "notion-update-page",
+      "description": "Update a Notion page's properties or content.\n\n## Core rules\n\n**IMPORTANT**: Before writing page content, read the MCP resource `notion://docs/enhanced-markdown-spec` through your MCP client's resource-reading interface, or call the Notion \"fetch\" tool with this URI if your client does not support reading MCP resources. Do NOT pass this URI to any other URL-fetching tool. Do NOT guess or hallucinate Markdown syntax. By default, use native Notion mentions for references you add to existing Notion pages, databases, data sources, people, and dates. Use Markdown links only for external URLs or when the user requests a plain link. For a person, use a user mention with their user URL, found with search using query_type \"user\"; do not write \"@Name\" as plain text. For a specific date or time, such as a due date or meeting time, use a date mention. The Markdown specification gives the mention syntax.\n\nBefore changing content, fetch unless already loaded. Match nearby headings, block types, nesting, list or table patterns, and prose style.\n\nMake the smallest edit. Use \"update_content\" for targeted search-and-replace and \"insert_content\" only to prepend or append. Avoid full-page \"replace_content\" when a targeted command is sufficient. Preserve unrelated wording, structure, order, and native references. Do not broadly rewrite unless asked.\n\nFor \"update_content\", use the smallest exact old_str that uniquely identifies the target. If the edit would remove material content the user did not identify, ask for confirmation first. After a multi-part or structural edit, fetch the page again and verify the requested content and nesting. Skip this extra read for a simple exact edit.\n\nFor \"replace_content\", preserve child pages and databases with their exact fetched tags. If validation reports that child content would be deleted, show the list and ask for confirmation. Never retry with \"allow_deleting_content\": true without confirmation. Report any \"warnings\" in the result.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "allow_async": {"type": "boolean", "description": "Default to true for page updates. Set to false only when the next step needs the updated page immediately, or when async execution rejects the request as too large. When this update operation is accepted for background execution, it returns an async_task result. Use get_async_task to wait for a succeeded status before taking a dependent action on the page. For apply_template, a succeeded status does not mean template content is ready; fetch and retry until it is ready before changing or relying on that content. If omitted or false, the tool waits for a synchronous result when possible, but may still return a pollable async_task response if queued execution exceeds the synchronous wait deadline."},
+          "allow_deleting_content": {"type": "boolean", "description": "Optional for \"replace_content\" and \"update_content\" commands. Set to true to allow deletion of child pages and databases that are not referenced in the new content. If false or omitted, the operation will fail with an error listing the pages/databases that would be deleted. Show that list and ask the user for confirmation before retrying with true."},
+          "command": {"type": "string", "enum": ["update_properties", "update_content", "replace_content", "insert_content", "apply_template", "update_verification"], "description": "The update command to execute."},
+          "content": {"type": "string", "description": "Required for \"insert_content\" command. The markdown content to insert into the page. For people and dates, use user and date mentions rather than plain text; notion://docs/enhanced-markdown-spec gives the syntax."},
+          "content_updates": {
+            "type": "array",
+            "description": "Required for \"update_content\" command. An array of search-and-replace operations, each with old_str (content to find) and new_str (replacement content).",
+            "items": {
+              "type": "object",
+              "properties": {
+                "new_str": {"type": "string", "description": "The new content string to replace old_str with. For people and dates, use user and date mentions rather than plain text; notion://docs/enhanced-markdown-spec gives the syntax."},
+                "old_str": {"type": "string", "description": "The existing content string to find and replace. Must exactly match the page content."},
+                "replace_all_matches": {"type": "boolean", "description": "If true, replaces all occurrences of old_str. If false (default), the operation fails if there are multiple matches."}
+              },
+              "required": ["old_str", "new_str"]
+            }
+          },
+          "cover": {"type": "string", "description": "An external image URL for the page cover. Use \"none\" to remove the cover. Omit to leave unchanged. Can be set alongside any command."},
+          "icon": {"type": "string", "description": "An emoji character (e.g. \"🚀\"), a custom emoji by name (e.g. \":rocket_ship:\"), a Notion icon identifier as returned by fetch (e.g. \"icons/pizza_blue\"), or an external image URL. Use \"none\" to remove the icon. Omit to leave unchanged. Can be set alongside any command. Keep the title free of a duplicate leading emoji because the icon renders separately."},
+          "is_skill": {"type": "boolean", "description": "Set to true to mark this page as a skill, or false to remove the skill designation. Can be set alongside any command. To change only skill status, use \"update_properties\" and omit \"properties\"."},
+          "new_str": {"type": "string", "description": "Required for \"replace_content\" command. The new content string to replace the entire page content with. Preserve child pages and databases with their exact fetched <page url=\"...\"> or <database url=\"...\"> tags. For people and dates, use user and date mentions rather than plain text; notion://docs/enhanced-markdown-spec gives the syntax."},
+          "page_id": {"type": "string", "description": "The ID of the page to update, with or without dashes."},
+          "position": {"type": "object", "description": "Optional for \"insert_content\" command. Use {\"type\":\"start\"} to prepend content or {\"type\":\"end\"} to append content. Omit to append.", "properties": {"type": {"type": "string", "enum": ["start", "end"]}}},
+          "properties": {"type": "object", "description": "Required for \"update_properties\" command. A JSON object that updates the page's properties.\nFor pages in a database, fetch the page or its data source first and use the exact property names and SQLite schema definition shown in <database>.\nFor pages outside of a database, the only allowed property is \"title\", which is the title of the page in inline markdown format.\nFor a Files property, an uploaded file can be provided as {\"type\":\"file_upload\",\"file_upload\":{\"id\":\"<file-upload-id>\"}} inside the property's array.\nUse null to remove a property's value.\n**IMPORTANT**: Some property types require specific formats:\n- Date properties: Split into \"date:{property}:start\", \"date:{property}:end\" (optional), and \"date:{property}:is_datetime\" (0 or 1)\n- Place properties: Split into \"place:{property}:name\", \"place:{property}:address\", \"place:{property}:latitude\", \"place:{property}:longitude\", and \"place:{property}:google_place_id\" (optional)\n- Number properties: Use JavaScript numbers (not strings)\n- Checkbox properties: Use \"__YES__\" for checked, \"__NO__\" for unchecked\n- Relation properties: Use an array of related page URLs or page IDs, e.g. [\"https://www.notion.so/26ab1f9f4c5f80b18d3bd10a6b1d2f4e\", \"26ab1f9f-4c5f-80b1-8d3b-d10a6b1d2f4e\"]\n- Person properties: Use an array of user IDs, user or agent URLs, or group references copied from fetch output (\"space_permission_group-<UUID>\"). Bare group UUIDs are also supported.\n- Files properties: Use a JSON array of file IDs, Notion Folder URLs, and/or <folder> tags copied from fetch output. Folders are stored as native Folder references, not ordinary links.\n\n\n**Special property naming**: Properties named \"id\" or \"url\" (case insensitive) must be prefixed with \"userDefined:\" (e.g., \"userDefined:URL\", \"userDefined:id\")"},
+          "template_id": {"type": "string", "description": "Required for \"apply_template\" command. The ID of a template to apply to this page; any page ID can be used as a template. Template content is appended to any existing page content asynchronously."},
+          "verification_expiry_days": {"type": "integer", "description": "Optional for \"update_verification\" command when verification_status is \"verified\". Number of days until verification expires (e.g. 7, 30, 90). Omit for indefinite verification."},
+          "verification_status": {"type": "string", "enum": ["verified", "unverified"], "description": "Required for \"update_verification\" command. Set to \"verified\" to mark the page as verified, or \"unverified\" to remove verification. Requires a Business or Enterprise plan unless the page is in a wiki. When updating verification, the owner will be automatically set to the authenticated actor."}
+        },
+        "required": ["page_id", "command"]
+      }
+    },
+    {
+      "name": "notion-create-comment",
+      "description": "Add a comment to a page or specific content.\n\nProvide `page_id` to identify the page, then choose ONE targeting mode:\n- `page_id` alone: Add a top-level comment to the page\n- `page_id` + `selection_with_ellipsis`: Start a new discussion on the matching block\n- `reply_to_comment_id`: Reply to a comment using its `id` from get-comments (page_id is still required)\n- `discussion_id`: Reply to an existing discussion (page_id is still required)\n\n\nProvide exactly one content format:\n- `markdown`: Preferred. Inline Notion-flavored Markdown for comment text. For exact syntax, read the MCP resource `notion://docs/enhanced-markdown-spec` through your MCP client's resource-reading interface, or call the Notion \"fetch\" tool with this URI if your client does not support reading MCP resources. Do NOT pass this URI to any other URL-fetching tool. Use only the Rich text types and Mentions syntax that comments support. Comments support inline formatting (bold, italic, strikethrough, underline, code, links), inline math using `$`Equation`$`, and user/page/database/date mention tags such as `<mention-date start=\"YYYY-MM-DD\"/>`. To attach a file created by `create-file-upload` or `create-attachment`, include its returned `suggested_markdown` on a separate line; up to three file attachments are supported. Do not use UI shortcuts like `@today`, `@name`, `[[page]]`, or autocomplete-style emoji syntax; those are editor affordances, not markdown syntax. Mention tags must include a real `url` where required by the spec. Other block-level Markdown such as headings, lists, tables, blockquotes, and fenced code blocks is stored as plain comment text rather than rendered as blocks.\n- `rich_text`: Array of rich text objects.\n\n\nFor content targeting, use `selection_with_ellipsis` with ~10 chars from start and end: \"# Section Ti...tle content\"",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "discussion_id": {"type": "string", "description": "The ID or URL of an existing discussion to reply to (e.g., discussion://pageId/blockId/discussionId)."},
+          "markdown": {"type": "string", "description": "The content of the comment as a Markdown string. Provide exactly one of markdown or rich_text. For exact syntax, read the MCP resource `notion://docs/enhanced-markdown-spec` through your MCP client's resource-reading interface, or call the Notion \"fetch\" tool with this URI if your client does not support reading MCP resources. Do NOT pass this URI to any other URL-fetching tool. Use only the Rich text types and Mentions syntax that comments support. Comments support inline formatting (bold, italic, strikethrough, underline, code, links), inline math using $`Equation`$, and user/page/database/date mention tags such as <mention-date start=\"YYYY-MM-DD\"/>. To attach a file created by create-file-upload or create-attachment, include its returned suggested_markdown on a separate line; up to three file attachments are supported. Do not use UI shortcuts like @today, @name, [[page]], or autocomplete-style emoji syntax; those are editor affordances, not markdown syntax. Mention tags must include a real url where required by the spec. Other block-level Markdown such as fenced code blocks, headings, lists, tables, and blockquotes is stored as plain comment text rather than rendered as blocks. Example: <example>Looks good.</example>."},
+          "page_id": {"type": "string", "description": "The ID of the page to comment on (with or without dashes)."},
+          "reply_to_comment_id": {"type": "string", "description": "The ID of the comment to reply to."},
+          "rich_text": {
+            "type": "array",
+            "description": "An array of rich text objects that represent the content of the comment. Provide exactly one of rich_text or markdown.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {"type": "string", "enum": ["text", "mention", "equation"], "description": "The rich text object type."},
+                "text": {"type": "object", "description": "If a rich text object's type value is `text`, then the corresponding text field contains an object including the text content and any inline link.", "properties": {"content": {"type": "string", "description": "The actual text content of the text."}, "link": {"type": "object", "description": "An object with information about any inline link in this text, if included.", "properties": {"url": {"type": "string", "description": "The URL of the link."}}}}, "required": ["content"]},
+                "mention": {"type": "object", "description": "Mention objects represent an inline mention of a database, date, link preview mention, page, template mention, or user. A mention is created in the Notion UI when a user types `@` followed by the name of the reference."},
+                "equation": {"type": "object", "description": "Notion supports inline LaTeX equations as rich text objects with a type value of `equation`.", "properties": {"expression": {"type": "string", "description": "A KaTeX compatible string."}}},
+                "annotations": {"type": "object", "description": "All rich text objects contain an annotations object that sets the styling for the rich text.", "properties": {"bold": {"type": "boolean", "description": "Whether the text is formatted as bold."}, "code": {"type": "boolean", "description": "Whether the text is formatted as code."}, "color": {"type": "string", "description": "The color of the text."}, "italic": {"type": "boolean", "description": "Whether the text is formatted as italic."}, "strikethrough": {"type": "boolean", "description": "Whether the text is formatted with a strikethrough."}, "underline": {"type": "boolean", "description": "Whether the text is formatted with an underline."}}}
+              }
+            }
+          },
+          "selection_with_ellipsis": {"type": "string", "description": "Unique start and end snippet of the content to comment on. DO NOT provide the entire string. Instead, provide up to the first ~10 characters, an ellipsis, and then up to the last ~10 characters. Make sure you provide enough of the start and end snippet to uniquely identify the content. For example: \"# Section heading...last paragraph.\""}
+        },
+        "required": ["page_id"]
+      }
+    },
+    {
+      "name": "notion-get-comments",
+      "description": "Get comments and discussions from a Notion page.\n\nReturns discussions with full comment content in XML format. By default, returns page-level discussions only. On supported Business connections, pending suggested edits use `kind=\"suggested_edit\"` and their `discussion://` URL can be passed to `get_suggested_edit`. Resolved suggestions stay retired. Check `suggested_edits_status` to distinguish an empty result from unavailable suggestion discovery. Comments you wrote have `by-you=\"true\"`.\n\nTip: Use the `fetch` tool with `include_discussions: true` first to see where discussions are anchored in the page content, then use this tool to retrieve full discussion threads. The `discussion://` URLs in the fetch output match the discussion IDs returned here.\n\nParameters:\n- `include_all_blocks`: Include discussions on child blocks (default: false)\n- `include_resolved`: Include resolved discussions (default: false)\n- `discussion_id`: Fetch a specific discussion by ID or URL\n\n\n<example>{\"page_id\": \"page-uuid\"}</example>\n<example>{\"page_id\": \"page-uuid\", \"include_all_blocks\": true}</example>\n<example>{\"page_id\": \"page-uuid\", \"discussion_id\": \"discussion://pageId/blockId/discussionId\"}</example>",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "discussion_id": {"type": "string", "description": "Fetch a specific discussion by ID or discussion URL (e.g., discussion://pageId/blockId/discussionId)."},
+          "include_all_blocks": {"type": "boolean", "description": "Include discussions on child blocks, not just page-level discussions. Defaults to false."},
+          "include_resolved": {"type": "boolean", "description": "Include resolved discussions in the response. Defaults to false."},
+          "page_id": {"type": "string", "description": "Identifier for a Notion page."}
+        },
+        "required": ["page_id"]
+      }
+    },
+    {
+      "name": "notion-get-users",
+      "description": "Retrieves a list of users in the current workspace. Shows workspace members and guests with their IDs, names, emails (if available), and types (person or bot).\n\nSupports cursor-based pagination to iterate through all users in the workspace.\n\n<examples>\n1. List all users (first page): {}\n\n2. Search for users by name or email: {\"query\": \"john\"}\n\n3. Get next page of results: {\"start_cursor\": \"abc123\"}\n\n4. Set custom page size: {\"page_size\": 20}\n\n5. Fetch a specific user by ID: {\"user_id\": \"00000000-0000-4000-8000-000000000000\"}\n\n6. Fetch the current user: {\"user_id\": \"self\"}\n</examples>",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "page_size": {"type": "integer", "description": "Number of users to return per page (1–100; default 100)."},
+          "query": {"type": "string", "description": "Optional search query to filter users by name or email (case-insensitive)."},
+          "start_cursor": {"type": "string", "description": "Cursor for pagination. Use the next_cursor value from the previous response to get the next page."},
+          "user_id": {"type": "string", "description": "Return only the user matching this ID. Pass \"self\" to fetch the current user."}
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "notion-get-teams",
+      "description": "Retrieves a list of teams (teamspaces) in the current workspace. Shows which teams exist, user membership status, IDs, names, and roles.\n\nTeams are returned split by membership status and limited to a maximum of 10 results.\n\n<examples>\n1. List all teams (up to the limit of each type): {}\n\n2. Search for teams by name: {\"query\": \"engineering\"}\n\n3. Find a specific team: {\"query\": \"Product Design\"}\n</examples>",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "description": "Optional search query to filter teams by name (case-insensitive)."}
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "notion-move-pages",
+      "description": "Move one or more Notion pages or databases to a new parent.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "new_parent": {
+            "type": "object",
+            "description": "The new parent under which the pages will be moved. This can be a page, the workspace, a database, or a specific data source under a database when there are multiple. Moving pages to the workspace level adds them as private pages and should rarely be used.",
+            "properties": {
+              "type": {"type": "string", "enum": ["page_id", "database_id", "data_source_id", "workspace"], "description": "The parent type."},
+              "page_id": {"type": "string", "description": "The ID of the parent page (with or without dashes), for example, 195de9221179449fab8075a27c979105"},
+              "database_id": {"type": "string", "description": "The ID of the parent database (with or without dashes), for example, 195de9221179449fab8075a27c979105"},
+              "data_source_id": {"type": "string", "description": "The ID of the parent data source (collection), with or without dashes. For example, f336d0bc-b841-465b-8045-024475c079dd"}
+            }
+          },
+          "page_or_database_ids": {"type": "array", "items": {"type": "string"}, "description": "An array of up to 100 page or database IDs to move. IDs are v4 UUIDs and can be supplied with or without dashes (e.g. extracted from a <page> or <database> URL given by the \"search\" or \"fetch\" tool). Data Sources under Databases can't be moved individually."}
+        },
+        "required": ["page_or_database_ids", "new_parent"]
+      }
+    },
+    {
+      "name": "notion-duplicate-page",
+      "description": "Duplicate a Notion page. The page must be within the current workspace, and you must have permission to access it. The duplication completes asynchronously, so do not rely on the new page identified by the returned ID or URL to be populated immediately. Let the user know that the duplication is in progress and that they can check back later using the 'fetch' tool or by clicking the returned URL and viewing it in the Notion app.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "page_id": {"type": "string", "description": "The ID of the page to duplicate. This is a v4 UUID, with or without dashes, and can be parsed from a Notion page URL."}
+        },
+        "required": ["page_id"]
+      }
+    },
+    {
+      "name": "notion-create-database",
+      "description": "Creates a new Notion database using SQL DDL syntax, or a canonical typed database for tasks, projects, or skills.\n\nProvide exactly one of:\n- schema: a CREATE TABLE statement. If no title property is provided, \"Name\" is auto-added.\n- database_type: one of tasks, projects, or skills. The database is created with the canonical required properties and typed metadata used by Notion.\n\n\nFor schema, use CREATE TABLE with double-quoted column names and single-quoted type options. If no title property is provided, \"Name\" is auto-added.\n\nProperty type syntax:\n- Simple: TITLE, RICH_TEXT, DATE, PEOPLE, CHECKBOX, URL, EMAIL, PHONE_NUMBER, FILES\n- SELECT('opt':color, ...) / MULTI_SELECT('opt':color, ...)\n- STATUS('Backlog':gray:to_do, 'Building':blue:in_progress, 'Shipped':green:complete); groups are to_do, in_progress, complete\n- NUMBER [FORMAT 'dollar'] / FORMULA('expression')\n- RELATION('ds') for a one-way relation\n- RELATION('ds', DUAL) for a two-way relation\n- RELATION('ds', DUAL 'Children') with a synced property name\n- RELATION('ds', DUAL 'Children' 'children') with a synced name and synced_id (for self-relations)\n- ROLLUP('rel_prop', 'target_prop', 'function')\n- UNIQUE_ID [PREFIX 'X'] / CREATED_TIME / LAST_EDITED_TIME\n- Any column: COMMENT 'description text' Colors: default, gray, brown, orange, yellow, green, blue, purple, pink, red.\n\n\nReturns Markdown with schema, SQLite definition, and data source ID in <data-source> tag for use with update_data_source and query_data_sources tools.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "database_type": {"type": "string", "enum": ["tasks", "projects", "skills"], "description": "Create a canonical typed database with Notion's required properties and metadata. Supported types: tasks, projects, skills. Example: <example>tasks</example>. Use title \"Tasks\" when needed."},
+          "description": {"type": "string", "description": "The description of the new database."},
+          "parent": {"type": "object", "description": "The parent under which to create the new database. If omitted, the database will be created as a private page at the workspace level.", "properties": {"page_id": {"type": "string", "description": "The ID of the parent page, with or without dashes."}, "type": {"type": "string", "enum": ["page_id"], "description": "Always `page_id`"}}, "required": ["page_id"]},
+          "schema": {"type": "string", "description": "SQL DDL CREATE TABLE statement defining the database schema. Cannot be combined with database_type. Column names must be double-quoted and type options use single quotes.\n\nExamples:\n- Minimal: <example>CREATE TABLE (\"Name\" TITLE)</example>\n- With options: <example>CREATE TABLE (\"Name\" TITLE, \"Budget\" NUMBER FORMAT 'dollar', \"Tags\" MULTI_SELECT('eng':blue, 'design':pink), \"Task ID\" UNIQUE_ID PREFIX 'PRJ')</example>\n- Self-relations are a two-step flow: create the database, then use its data source ID with update_data_source to add paired properties such as RELATION('ds', DUAL 'Children' 'children')."},
+          "title": {"type": "string", "description": "The title of the new database."}
+        },
+        "required": []
+      }
+    },
+    {
+      "name": "notion-create-file-upload",
+      "description": "Create a short-lived URL for uploading one local file directly to Notion.\n\nAfter calling this tool, send exactly one multipart/form-data POST request to `upload_url`. Put the file in the `file` form field and include every header returned in `upload_headers`. Files are limited to 20 MiB for this single-part upload flow, and workspace file-size limits still apply.\n\nThe upload response includes `markdown_source` and `suggested_markdown`, which can be passed directly to create-pages or update-page, or included on a separate line in create-comment markdown to attach the file. The URL is short-lived, can upload only the FileUpload created by this call, and runs as this same integration.\n\n<examples>\n1. Prepare an image upload: {\"filename\":\"diagram.png\"}\n2. Prepare a PDF upload with an explicit MIME type: {\"filename\":\"report.pdf\",\"content_type\":\"application/pdf\"}\n</examples>",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "content_type": {"type": "string", "description": "Optional MIME type, such as application/pdf or image/png. Prefer omitting it so the type is inferred from the filename: a type that disagrees with the extension is stored as given, and the file then renders as the wrong kind."},
+          "filename": {"type": "string", "description": "The filename to create in Notion, including a supported extension such as .pdf, .png, or .zip."}
+        },
+        "required": ["filename"]
+      }
+    },
+    {
+      "name": "notion-get-async-task",
+      "description": "Retrieves the current status of an async task that was started by another tool (for example, \"create_pages\" called with \"allow_async\": true).\n\nThe status is one of \"queued\", \"running\", \"retrying\", \"succeeded\", or \"failed\". When the task has succeeded, the operation's result is included; when it has failed, an error is included instead.\n\nPoll this tool with the \"task_id\" from the original tool's \"async_task\" response. Wait briefly between polls — the original response includes a suggested backoff.\n\n<examples>\n1. Check a task's status: {\"task_id\": \"task_abc123\"}\n</examples>",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "task_id": {"type": "string", "description": "The ID of the async task to retrieve, as returned in the async_task response of the tool that started it."}
+        },
+        "required": ["task_id"]
+      }
+    },
+    {
+      "name": "notion-create-attachment",
+      "description": "Create an attachment and upload it to Notion.\n\nProvide exactly one source:\n- content for small UTF-8 text artifacts such as HTML, Markdown, plain text, CSV, JSON, XML, CSS, YAML, TSV, calendar, GPX, or SVG files.\n- source_url for a direct, publicly reachable HTTPS file URL.\n- source_file_id for a file this exact integration already uploaded. When create_file_upload is available, use it for local files so the upload has the same owner.\n\n\nFor content and source_url, filename must use a supported extension and content_type must agree with it. Omit content_type to infer it. source_file_id takes neither because the stored upload carries both. For larger files, redirects, or authenticated downloads, upload through the Notion File Upload API with this integration's token and pass source_file_id.\n\nThe response includes a markdown_source value. To place the uploaded file on a page, pass that source to create-pages or update-page. To attach it to a comment, include suggested_markdown on a separate line in create-comment markdown. Unattached uploads remain temporary and are deleted once they expire: content and source_url open a fresh one-hour window, while source_file_id keeps the window that opened when the file was first uploaded, so place that source promptly and upload the file again if it has already expired. \"HTML\", \"HTML block\", \"HTML artifact\", and \"HTML embed\" all mean an HTML file placed with <embed src=\"file-upload://...\"> so Notion renders the sandboxed preview. Never place HTML in a code block or file block. Use <file src=\"file-upload://...\"> for other files.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "content": {"type": "string", "description": "The complete UTF-8 text content of the file. Maximum 200 KiB after UTF-8 encoding. Requires filename. Examples: <example><!doctype html><html><body><h1>Report</h1></body></html></example> or <example># Notes\n\nHello</example>."},
+          "content_type": {"type": "string", "description": "Optional MIME type, such as text/html or application/pdf. It must match the filename extension; omit it to infer the type from the filename. Omit it with source_file_id; the stored upload already carries a content type."},
+          "filename": {"type": "string", "description": "The filename to create in Notion, including a supported extension such as .html, .md, .pdf, or .png. Required with content and source_url. Omit it with source_file_id; the stored upload already carries a filename."},
+          "source_file_id": {"type": "string", "description": "The ID of a file upload this exact integration already created. Use create_file_upload when available; otherwise run `ntn files create` or use the Notion File Upload API with this integration's token. Its status must be uploaded. An upload created with a different token is not visible. Example: <example>1e2f3a4b-5c6d-7e8f-9a0b-1c2d3e4f5a6b</example>."},
+          "source_url": {"type": "string", "description": "A direct, publicly reachable HTTPS URL from which Notion can download the file within one minute. Notion makes a metadata-only HEAD request when supported, then a GET. Redirects, private network addresses, custom request headers, and cookies are not supported. Downloads are limited to 5 MiB for free workspaces and 50 MiB for paid workspaces. Requires filename. Example: <example>https://storage.example.com/report.pdf?signature=...</example>."}
+        },
+        "required": []
+      }
+    }
+  ]
+}
